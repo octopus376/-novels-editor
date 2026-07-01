@@ -1,0 +1,43 @@
+{
+  "name": "novel-editor",
+  "version": "1.0.0",
+  "description": "小说编辑器 - 专业长篇小说写作工具",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win portable",
+    "build:dir": "electron-builder --win portable --dir"
+  },
+  "author": "",
+  "license": "MIT",
+  "build": {
+    "appId": "com.novel-editor.app",
+    "productName": "小说编辑器",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/**/*",
+      "assets/**/*"
+    ],
+    "extraMetadata": {
+      "main": "main.js"
+    },
+    "win": {
+      "target": "portable",
+      "icon": "assets/icon.png"
+    },
+    "portable": {
+      "artifactName": "小说编辑器.exe"
+    }
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "dependencies": {
+    "quill": "^2.0.0"
+  }
+}

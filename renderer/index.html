@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:;">
+  <title>小说编辑器</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body data-theme="light">
+<script>
+(function(){
+  var t=localStorage.getItem('novel-editor-theme');
+  if(t) document.body.setAttribute('data-theme',t);
+  var b=localStorage.getItem('novel-editor-bg');
+  if(b) try{var d=JSON.parse(b);if(d.image){document.body.classList.add('has-custom-bg');document.body.style.setProperty('--bg-image','url('+d.image+')');document.body.style.setProperty('--bg-opacity',d.opacity/100);}}catch(e){}
+})();
+</script>
+<!-- 欢迎页 -->
+<div id="welcome-screen" class="welcome-screen">
+  <div class="welcome-content">
+    <h1 data-i18n="appTitle">✍️ 小说编辑器</h1>
+    <p class="welcome-subtitle" data-i18n="appSubtitle">左侧写作 · 右侧手机预览 — 每行15字 · 自动保存</p>
+    <div class="welcome-actions">
+      <button class="btn btn-primary btn-lg" id="btn-new-book" data-i18n="newBook">📕 新建小说</button>
+      <button class="btn btn-secondary btn-lg" id="btn-welcome-lang">中/EN</button>
+      <button class="btn btn-secondary btn-lg" id="btn-welcome-bg" data-i18n="bgSettingsTitle">🎨 背景设置</button>
+    </div>
+
+    <!-- 最近作品 -->
+    <div class="recent-section" id="recent-section" style="display:none">
+      <h3 data-i18n="recentWorks">📚 最近作品</h3>
+      <div class="recent-list" id="recent-list"></div>
+    </div>
+
+    <!-- 导入作品 -->
+    <div class="import-section">
+      <h3 data-i18n="importWorks">📥 导入作品</h3>
+      <p class="import-desc" data-i18n="importDesc">选择另一台电脑导出的 .novel 文件即可录入</p>
+      <button class="btn btn-primary" id="btn-import">📂 选择文件导入</button>
+      <div class="import-msg" id="import-msg"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 主编辑界面 -->
+<div id="editor-screen" class="editor-screen" style="display:none">
+
+  <!-- 工具栏 -->
+  <header class="toolbar">
+    <div class="toolbar-left">
+      <button class="toolbar-btn" id="btn-toggle-sidebar" title="侧边栏">☰</button>
+      <button class="btn-back" id="btn-back-home" title="返回书架" data-i18n="backHome">← 书架</button>
+    </div>
+    <div class="toolbar-center">
+      <span class="project-title" id="project-title">《未命名小说》</span>
+      <span class="word-count">当前 <strong id="word-count-current">0</strong> 字</span>
+      <span class="word-divider">|</span>
+      <span class="word-count">总计 <strong id="word-count-total">0</strong> 字</span>
+      <span class="save-indicator" id="save-indicator">💾 已保存</span>
+    </div>
+    <div class="toolbar-right">
+      <select id="theme-select" class="theme-select">
+        <option value="light" data-i18n="themeLight">☀️ 日间</option>
+        <option value="dark" data-i18n="themeDark">🌙 夜间</option>
+        <option value="eye-care" data-i18n="themeEye">🌿 护眼</option>
+      </select>
+      <select id="font-size-select" class="theme-select">
+        <option value="14">14px</option><option value="16" selected>16px</option>
+        <option value="18">18px</option><option value="20">20px</option><option value="22">22px</option>
+      </select>
+      <button class="toolbar-btn" id="btn-toggle-phone" title="显示/隐藏手机预览">📱</button>
+      <button class="toolbar-btn" id="btn-toggle-lang" title="Switch Language">中/EN</button>
+      <button class="toolbar-btn" id="btn-export" title="导出">📤</button>
+    </div>
+  </header>
+
+  <!-- 主体 -->
+  <div class="main-area">
+
+    <!-- 左侧边栏 - 章节 -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <h3 data-i18n="toc">📑 目录</h3>
+        <button class="btn-icon" id="btn-add-chapter" title="添加章节">＋</button>
+      </div>
+      <div class="chapter-list" id="chapter-list"></div>
+      <div class="sidebar-footer">
+        <button class="btn btn-sm btn-secondary" id="btn-add-volume">＋ 添加卷</button>
+      </div>
+    </aside>
+
+    <!-- 左侧格式面板 -->
+    <div class="action-panel" id="action-panel">
+      <div class="action-clock" id="action-clock">
+        <div class="clock-time" id="clock-time">00:00:00</div>
+        <div class="clock-date" id="clock-date">2026-06-28</div>
+        <div class="clock-week" id="clock-week">星期日</div>
+      </div>
+      <div class="action-divider"></div>
+      <div class="format-label">格式</div>
+      <button class="action-btn fmt-btn" data-fmt="bold">加粗</button>
+      <button class="action-btn fmt-btn" data-fmt="italic">斜体</button>
+      <button class="action-btn fmt-btn" data-fmt="underline">下划线</button>
+      <button class="action-btn fmt-btn" id="btn-font-color">字体颜色</button>
+      <button class="action-btn fmt-btn" id="btn-bg-color">背景颜色</button>
+      <button class="action-btn fmt-btn" id="btn-clear-fmt">清除格式</button>
+      <div class="action-divider"></div>
+      <button class="action-btn" id="btn-insert-image" title="插入图片">🖼️ 插图</button>
+    </div>
+
+    <!-- 颜色选择弹窗 -->
+    <div class="modal-overlay" id="modal-color-pick" style="display:none">
+      <div class="modal" style="width:340px">
+        <h2 id="color-pick-title">选择颜色</h2>
+        <div class="color-grid" id="color-grid"></div>
+        <div class="modal-actions">
+          <button class="btn btn-outline" id="btn-cancel-color">取消</button>
+          <button class="btn btn-primary" id="btn-confirm-color">确定</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quill 编辑器 -->
+    <div class="editor-area">
+      <div class="editor-container">
+        <div class="editor-header">
+          <input type="text" class="chapter-title-input" id="chapter-title" data-i18n-placeholder="chapterPlaceholder" placeholder="章节标题">
+        </div>
+        <div id="editor" class="quill-editor"></div>
+      </div>
+    </div>
+
+    <!-- 手机预览 -->
+    <div class="phone-panel" id="phone-panel">
+      <div class="phone-panel-label">📱 手机预览</div>
+      <div class="phone-device">
+        <div class="phone-body">
+          <div class="phone-screen">
+            <!-- Dynamic Island -->
+            <div class="phone-dynamic-island">
+              <div class="dynamic-island-pill">
+                <div class="island-camera"></div>
+              </div>
+            </div>
+            <div class="phone-status-bar"><span class="status-time" id="status-time">9:41</span><span class="status-icons">▂▄▆█ 🔋85%</span></div>
+            <div class="phone-reader-header"><span class="phone-book-title" id="phone-book-title">章节名</span></div>
+            <div class="phone-reader-content" id="phone-reader-content"><div class="phone-empty-hint">在左侧编辑器中输入文字<br>这里实时预览<br><br>📱 每行15字排版</div></div>
+            <div class="phone-reader-footer"><span id="phone-line-count">0 行</span><span id="phone-char-count">0 字</span></div>
+          </div>
+          <div class="phone-home-bar"><div class="home-indicator"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 导出对话框 -->
+<div class="modal-overlay" id="modal-export" style="display:none">
+  <div class="modal">
+    <h2 data-i18n="exportTitle">导出小说</h2>
+    <div class="form-group">
+      <label>格式</label>
+      <select id="export-format" class="form-input">
+        <option value="txt">纯文本 .txt（15字/行排版）</option>
+        <option value="html">网页 .html（手机尺寸）</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>范围</label>
+      <select id="export-scope" class="form-input">
+        <option value="all" data-i18n="exportScopeAll">全部章节</option>
+        <option value="current" data-i18n="exportScopeCurrent">仅当前章节</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" id="btn-cancel-export">取消</button>
+      <button class="btn btn-primary" id="btn-confirm-export">导出</button>
+    </div>
+  </div>
+</div>
+
+<!-- 新建小说对话框 -->
+<div class="modal-overlay" id="modal-new-book" style="display:none">
+  <div class="modal">
+    <h2 data-i18n="newBookTitle">📕 新建小说</h2>
+    <div class="form-group">
+      <label data-i18n="bookName">小说名称</label>
+      <input type="text" id="input-new-book-title" class="form-input" data-i18n-placeholder="bookNamePlaceholder" placeholder="请输入小说名称" autofocus>
+    </div>
+    <div class="form-group">
+      <label data-i18n="author">作者</label>
+      <input type="text" id="input-new-book-author" class="form-input" placeholder="请输入作者名">
+    </div>
+    <div class="form-group">
+      <label>封面图片（可选）</label>
+      <div class="cover-row">
+        <div class="cover-preview" id="cover-preview" style="width:80px;height:100px;border:2px dashed var(--border-color);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:28px;background:var(--bg-input);cursor:pointer">📷</div>
+        <button class="btn btn-sm btn-outline" id="btn-pick-cover">选择封面</button>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" id="btn-cancel-new-book">取消</button>
+      <button class="btn btn-primary" id="btn-create-book">创建</button>
+    </div>
+  </div>
+</div>
+
+<!-- 添加卷对话框 -->
+<div class="modal-overlay" id="modal-add-volume" style="display:none">
+  <div class="modal">
+    <h2>📑 添加卷</h2>
+    <div class="form-group">
+      <label>卷名</label>
+      <input type="text" id="input-volume-title" class="form-input" placeholder="例如：第一卷">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" id="btn-cancel-volume">取消</button>
+      <button class="btn btn-primary" id="btn-confirm-volume">添加</button>
+    </div>
+  </div>
+</div>
+
+<!-- 导入章节到卷 -->
+<div class="modal-overlay" id="modal-import-chapters" style="display:none">
+  <div class="modal">
+    <h2>📂 导入章节到 <span id="import-vol-name">卷名</span></h2>
+    <div class="select-all-row" id="select-all-chapters">☐ 全选 / 取消全选</div>
+    <div class="chapter-check-list" id="chapter-check-list"></div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" id="btn-cancel-import">取消</button>
+      <button class="btn btn-primary" id="btn-confirm-import">确定导入</button>
+    </div>
+  </div>
+</div>
+
+<!-- 使用说明弹窗 -->
+<div class="modal-overlay" id="modal-help" style="display:none">
+  <div class="modal" style="max-width:620px;max-height:80vh;overflow-y:auto">
+    <h2>📖 使用说明</h2>
+    <div class="help-content">
+
+      <h4>📕 新建小说</h4>
+      <p>首页 → 点击「📕 新建小说」→ 输入书名 → 点「创建」或回车。<br>快捷键：<b>Ctrl+N</b></p>
+
+      <h4>🏠 书架（首页）</h4>
+      <p>· 展示所有已创建的小说，点击卡片进入编辑。<br>· 右键卡片 → 修改书名/作者/删除小说。<br>· 📤 按钮 → <b>导出 .novel 文件</b>，可复制到U盘带到另一台电脑。<br>· 书架有滚动条，书多不会遮挡按钮。</p>
+
+      <h4 data-i18n="importWorks">📥 导入作品</h4>
+      <p>首页「📂 选择文件导入」→ 选中另一台电脑导出的 .novel 文件 → 自动录入。<br>适合在多台电脑间迁移作品，文件通常只有几十KB。</p>
+
+      <h4>📑 章节管理（左侧目录）</h4>
+      <p>· 「＋」— 添加新章节（归入当前选中的卷）。<br>· 「＋ 添加卷」— 弹出输入框，输入卷名后创建。<br>· <b>双击章节名</b> — 内联重命名，回车保存，Esc取消。<br>· <b>双击卷名</b> — 内联重命名，回车保存，Esc取消。<br>· 「🗑」— 删除章节（就近跳转上一章或下一章）。<br>· 「导入」— 将未归入此卷的章节导入，勾选后确认。<br>· 「全选」— 勾选/取消全部待导入章节。<br>· 点击卷名 — <b>选中</b>此卷（高亮），后续新建章节自动归入。<br>· 点击 ▼/▶ — <b>折叠/展开</b>卷内章节。<br>· 悬停「×」— 删除卷（章节保留，变为未分卷）。</p>
+
+      <h4>✍️ 正文编辑</h4>
+      <p>空章节显示引导语「请在此处开始输入小说正文」，打字自动消失。<br>编辑器<b>两端对齐</b>，每行约15字，与手机预览一致。<br>章节标题固定在顶部，滚动不消失。<br>快捷键：<b>Ctrl+S</b> 保存 · <b>Ctrl+Z</b> 撤销 · <b>Ctrl+Y</b> 重做。</p>
+
+      <h4>🎨 文字格式（左侧面板）</h4>
+      <p><b>操作：先选中文字 → 再点按钮</b><br>
+      · 「加粗」— 选中文字点击加粗，再点取消。<br>
+      · 「斜体」— 选中文字点击倾斜，再点取消。<br>
+      · 「下划线」— 选中文字添加下划线，再点取消。<br>
+      · 「字体颜色」— 选中文字 → 点击 → 选色块 → 确定（红橙黄绿青蓝紫黑白灰粉棕）。<br>
+      · 「背景颜色」— 同上，给文字加背景色。<br>
+      · 「清除格式」— 选中文字 → 移除所有格式。<br>
+      · 「🖼️ 插图」— 光标放目标位置 → 点击 → 选图片 → 自动压缩插入（jpg/png/gif/webp/bmp）。<br>
+      　图片自动压缩至宽度400px以内，保证导出文件不臃肿。</p>
+
+      <h4>📱 手机预览（右侧）</h4>
+      <p>iPhone 15 风格实时预览：每行15字 / 首行缩进2字符 / 段落间距 / 标点不置行首 / 插图同步显示 / 自动滚动到最新内容。<br>工具栏「📱」可显示/隐藏。</p>
+
+      <h4>🕐 时钟</h4>
+      <p>左侧面板显示实时时间（精确到秒）、日期、星期。</p>
+
+      <h4>💾 保存</h4>
+      <p>数据<b>自动保存</b>到应用内部（localStorage），无需手动选文件夹。<br>关闭或切换章节时自动保存。「✅ 已保存」确认。</p>
+
+      <h4>📤 导出作品（TXT/HTML）</h4>
+      <p>工具栏「📤」或菜单「小说 → 导出」。可选当前章节或全部章节。<br>TXT 纯文本15字/行，HTML 手机尺寸网页。</p>
+
+      <h4>🔗 跨电脑迁移</h4>
+      <p>导出 .novel 文件 → U盘/微信/网盘 → 另一台电脑导入。<br>图片自动压缩，导出文件小巧（纯文本万字仅几十KB）。</p>
+
+      <h4>🎨 主题与字体</h4>
+      <p>工具栏下拉：☀️ 日间 / 🌙 夜间 / 🌿 护眼。<br>字体大小：14px ~ 22px。</p>
+
+      <h4>🏠 导航按钮</h4>
+      <p>「☰」— 折叠/展开左侧目录。<br>「← 书架」— 返回首页（自动保存）。<br>「📱」— 显示/隐藏手机预览。</p>
+
+      <h4>⌨️ 快捷键</h4>
+      <p><b>Ctrl+N</b> 新建 · <b>Ctrl+S</b> 保存 · <b>Ctrl+Z</b> 撤销 · <b>Ctrl+Y</b> 重做 · <b>F11</b> 全屏 · <b>Esc</b> 关闭弹窗</p>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" id="btn-close-help">知道了</button>
+    </div>
+  </div>
+</div>
+
+<!-- 背景设置弹窗 -->
+<div class="modal-overlay" id="modal-bg-settings" style="display:none">
+  <div class="modal">
+    <h2 data-i18n="bgSettingsTitle">🎨 背景设置</h2>
+    <div class="form-group">
+      <label data-i18n="bgImage">背景图片</label>
+      <div class="cover-row">
+        <button class="btn btn-sm btn-outline" id="btn-pick-bg" data-i18n="pickBgImage">选择背景图片</button>
+        <button class="btn btn-sm btn-outline" id="btn-remove-bg" data-i18n="removeBg">移除背景</button>
+      </div>
+    </div>
+    <div class="form-group">
+      <label><span data-i18n="bgOpacity">透明度</span>: <span id="bg-opacity-val">100%</span></label>
+      <input type="range" id="bg-opacity-slider" min="0" max="100" value="100" class="opacity-slider">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" id="btn-cancel-bg" data-i18n="cancel">取消</button>
+      <button class="btn btn-primary" id="btn-save-bg" data-i18n="bgApply">应用</button>
+    </div>
+  </div>
+</div>
+
+<!-- 确认删除对话框 -->
+<div class="modal-overlay" id="modal-confirm-delete" style="display:none">
+  <div class="modal">
+    <h2 id="confirm-delete-title">确认删除</h2>
+    <p id="confirm-delete-msg" style="color:var(--text-secondary);margin-bottom:20px"></p>
+    <div class="modal-actions">
+      <button class="btn btn-outline" id="btn-cancel-delete">取消</button>
+      <button class="btn btn-danger" id="btn-confirm-delete">确认删除</button>
+    </div>
+  </div>
+</div>
+
+<!-- 设置对话框 -->
+<div class="modal-overlay" id="modal-book-settings" style="display:none">
+  <div class="modal">
+    <h2>小说设置</h2>
+    <div class="form-group">
+      <label>书名</label>
+      <input type="text" id="input-book-title" class="form-input" placeholder="小说名称">
+    </div>
+    <div class="form-group">
+      <label>作者</label>
+      <input type="text" id="input-book-author" class="form-input" placeholder="作者名">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-danger" id="btn-delete-book">🗑 删除</button>
+      <button class="btn btn-outline" id="btn-cancel-settings">取消</button>
+      <button class="btn btn-primary" id="btn-save-settings">保存</button>
+    </div>
+  </div>
+</div>
+
+<script src="../node_modules/quill/dist/quill.js"></script>
+<script src="lang.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
